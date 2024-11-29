@@ -1,0 +1,51 @@
+name: Update Repository
+
+on:
+  repository_dispatch:
+    types: [package-updated]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight
+
+jobs:
+  update-repo:
+    runs-on: ubuntu-latest
+    container: 
+      image: archlinux:base-devel
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm git curl wget
+
+      - name: Setup Repository Structure
+        run: |
+          mkdir -p x86_64
+          chmod +x setup_repo.sh update_repo.sh
+
+      - name: Download Latest Packages
+        run: |
+          # Download nebula-software
+          latest_release=$(curl -s https://api.github.com/repos/teamnebulaos/nebula-software/releases/latest)
+          download_url=$(echo "$latest_release" | grep "browser_download_url.*pkg.tar.zst" | cut -d '"' -f 4)
+          wget -P x86_64/ "$download_url"
+          
+          # Add more packages here as needed
+
+      - name: Update Repository
+        run: |
+          cd x86_64
+          repo-add nebulaos.db.tar.gz *.pkg.tar.zst
+          ln -sf nebulaos.db.tar.gz nebulaos.db
+          ln -sf nebulaos.files.tar.gz nebulaos.files
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          git add x86_64/
+          git commit -m "Update repository" || echo "No changes to commit"
+          git push

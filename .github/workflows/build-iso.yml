@@ -1,0 +1,48 @@
+name: Build ISO
+
+on:
+  repository_dispatch:
+    types: [build-iso]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'  # Run weekly on Sunday
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: 
+      image: archlinux:base-devel
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm archiso jq curl
+
+      - name: Build ISO
+        run: |
+          chmod +x build_iso.sh
+          ./build_iso.sh
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: iso-${{ github.sha }}
+          release_name: NebulaOS ISO ${{ github.sha }}
+          draft: false
+          prerelease: false
+
+      - name: Upload ISO
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: /tmp/archiso-out/nebulaos-*.iso
+          asset_name: nebulaos-latest.iso
+          asset_content_type: application/x-iso9660-image
