@@ -1,0 +1,6 @@
+*.pkg.tar.zst
+*.db
+*.db.tar.gz
+*.files
+*.files.tar.gz
+build/
