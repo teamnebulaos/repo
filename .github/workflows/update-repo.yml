@@ -36,9 +36,12 @@ jobs:
         run: |
           mkdir -p $GITHUB_WORKSPACE/x86_64
           touch $GITHUB_WORKSPACE/x86_64/.gitkeep
-          if [ ! -f "$GITHUB_WORKSPACE/x86_64/nebula.db.tar.gz" ]; then
-            cd $GITHUB_WORKSPACE/x86_64
-            repo-add nebula.db.tar.gz
+          cd $GITHUB_WORKSPACE/x86_64
+          if [ ! -f "nebula.db.tar.gz" ]; then
+            echo "Creating empty database..."
+            touch empty.pkg.tar.zst
+            repo-add -n -R nebula.db.tar.gz empty.pkg.tar.zst
+            rm empty.pkg.tar.zst
           fi
 
       - name: Download package
@@ -50,9 +53,14 @@ jobs:
       - name: Update repository
         run: |
           cd $GITHUB_WORKSPACE/x86_64
-          rm -f nebula.db*
-          rm -f nebula.files*
-          repo-add -n -R nebula.db.tar.gz *.pkg.tar.zst
+          if ls *.pkg.tar.zst 1> /dev/null 2>&1; then
+            echo "Updating repository with new packages..."
+            rm -f nebula.db*
+            rm -f nebula.files*
+            repo-add -n -R nebula.db.tar.gz *.pkg.tar.zst
+          else
+            echo "No packages to update in repository"
+          fi
           
       - name: Push changes
         run: |
@@ -61,6 +69,7 @@ jobs:
           git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
 
       - name: Create Release
+        if: github.event_name == 'repository_dispatch'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: repo
@@ -71,4 +80,3 @@ jobs:
             x86_64/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
